@@ -24,15 +24,17 @@ data = read.table(
               'symmetry_worst', 'fractal_dimension_worst')
 )
 
+M = 1
 N = 100
-X = data.matrix(data[, c('radius_mean', 'texture_mean')])[1:N, ]
+X = data.matrix(data[, c('radius_mean', 'texture_mean')])
 y = rep(-1, nrow(X))
-y[which(data$diagnosis[1:N] == 'M')] = 1
+y[which(data$diagnosis == 'M')] = 1
 
 plot(X, col=y+3)
 
 source('./hypercuts.R')
-m = bdk_train(X, y, kernel='linear', sig=1)
-bdk_mesh(m, c(0, 30), c(5, 40), 0.1)
+m = ada_bdk_train(X, y, T=10, kernel='rbf', sig=3, bs_rate=0.3)
+err = length(which(ada_bdk_predict(m, X) != y)) / length(y)
+ada_bdk_mesh(m, c(0, 30), c(5, 40), 0.1)
 points(X, col=y+3)
 
