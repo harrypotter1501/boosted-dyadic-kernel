@@ -153,7 +153,6 @@ ada_bdk_train = function(X, y, T, kernel='linear', sig=1, bs_rate=0.1) {
     }
     
     err_min = Inf
-    flip_t = 1
     best_pred = rep(1, N)
     
     for(i in idp) {
@@ -161,25 +160,20 @@ ada_bdk_train = function(X, y, T, kernel='linear', sig=1, bs_rate=0.1) {
         b = -(K[i, i] - K[j, j]) / 2
         pred = K[, i] - K[, j] + b
         err_t = sum(w[which(sign(pred) != y)])
-#        if(err_t > 0.5) {
-#          flip_t = -1
-#          err_t = 1 - err_t
-#        }
-#        else {
-#          flip_t = 1
-#        }
-        if(err_t < err_min || 1 - err_t < err_min) {
+        
+        if(err_t < err_min) {
           xi = X[i, , drop=F]
           xj = X[j, , drop=F]
           best_pred = pred
           flip[t] = 1
-          
-          if(err_t > 0.5) {
-            flip[t] = -1
-            err_t = 1 - err_t
-            best_pred = -pred
-          }
           err_min = err_t
+        }
+        else if(1 - err_t < err_min) {
+          xi = X[i, , drop=F]
+          xj = X[j, , drop=F]
+          err_min = 1 - err_t
+          best_pred = -pred
+          flip[t] = -1
         }
       }
     }
@@ -194,11 +188,12 @@ ada_bdk_train = function(X, y, T, kernel='linear', sig=1, bs_rate=0.1) {
     # test
     model = list(Xi=Xi[1:t, ,drop=F], Xj=Xj[1:t, , drop=F], T=t, w=w, a=a[1:t], err=err[1:t], flip=flip[1:t], 
                  kernel=kernel, sigma=sig, means=means, stdevs=stdevs)
+    
     be = length(which(ada_bdk_predict(model, X) != y)) / length(y)
     boost_errs[t] = be
     upper[t] = upper_bound(err[1:t])
     model = append(model, list(boost_errs=boost_errs[1:t], upper=upper[1:t]))
-    print(sprintf('Boosting %d rounds... Current accuracy = %f', t, 1 - be))
+    print(sprintf('Boosting %d rounds... Current w_err = %f, accuracy = %f', t, err_min, 1 - be))
     
     if(be == 0) {
       break
@@ -240,7 +235,7 @@ ada_bdk_predict = function(model, X, likelihood=FALSE) {
   flip = model$flip
   
   pred = apply(Ki - Kj + b, 1, function(row) {
-    return(sum(flip * a * row))
+    return(sum(flip * a * sign(row)))
   })
   
   if(likelihood) {
