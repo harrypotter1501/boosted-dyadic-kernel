@@ -98,6 +98,11 @@ bdk_mesh = function(m, xlim, ylim, step=0.1) {
   points(t(matrix(c(m$xi,m$xj), 2, 2)), pch=20, col=c(4, 2))
 }
 
+upper_bound = function(eps) {
+  res = exp(-2 * sum((1/2 - eps)^2))
+  return(res)
+}
+
 w_update = function(w, a, y, pred) {
   wn = w * exp(-a * y * pred)
   wn = wn / sum(wn)
@@ -127,7 +132,14 @@ ada_bdk_train = function(X, y, T, kernel='linear', sig=1, bs_rate=0.1) {
   a = rep(0, T)
   err = rep(0, T)
   flip = rep(1, T)
-  eps = 1e-8
+  eps = 1e-16
+  
+  # model for every round
+  model = list()
+  
+  # errors
+  boost_errs = rep(0, T)
+  upper = rep(0, T)
   
   # boost
   for(t in 1:T) {
@@ -147,20 +159,27 @@ ada_bdk_train = function(X, y, T, kernel='linear', sig=1, bs_rate=0.1) {
     for(i in idp) {
       for(j in idn) {
         b = -(K[i, i] - K[j, j]) / 2
-        pred = sign(K[, i] - K[, j] + b)
-        err_t = sum(w[which(pred != y)])
-        if(err_t > 0.5) {
-          flip_t = -1
-          err_t = 1 - err_t
-        }
-        else {
-          flip_t = 1
-        }
-        if(err_t < err_min) {
+        pred = K[, i] - K[, j] + b
+        err_t = sum(w[which(sign(pred) != y)])
+#        if(err_t > 0.5) {
+#          flip_t = -1
+#          err_t = 1 - err_t
+#        }
+#        else {
+#          flip_t = 1
+#        }
+        if(err_t < err_min || 1 - err_t < err_min) {
           xi = X[i, , drop=F]
           xj = X[j, , drop=F]
-          err_min = err_t
           best_pred = pred
+          flip[t] = 1
+          
+          if(err_t > 0.5) {
+            flip[t] = -1
+            err_t = 1 - err_t
+            best_pred = -pred
+          }
+          err_min = err_t
         }
       }
     }
@@ -169,17 +188,24 @@ ada_bdk_train = function(X, y, T, kernel='linear', sig=1, bs_rate=0.1) {
     Xj[t, ] = xj
     
     err[t] = err_min
-    flip[t] = flip_t
     a[t] = 1/2 * log((1 - err_min) / (err_min + eps))
-    w = w_update(w, a[t], y, best_pred)
+    w = w_update(w, a[t], y, sign(best_pred))
     
-    if(err_min == 0) {
+    # test
+    model = list(Xi=Xi[1:t, ,drop=F], Xj=Xj[1:t, , drop=F], T=t, w=w, a=a[1:t], err=err[1:t], flip=flip[1:t], 
+                 kernel=kernel, sigma=sig, means=means, stdevs=stdevs)
+    be = length(which(ada_bdk_predict(model, X) != y)) / length(y)
+    boost_errs[t] = be
+    upper[t] = upper_bound(err[1:t])
+    model = append(model, list(boost_errs=boost_errs[1:t], upper=upper[1:t]))
+    print(sprintf('Boosting %d rounds... Current accuracy = %f', t, 1 - be))
+    
+    if(be == 0) {
       break
     }
   }
   
-  return(list(Xi=Xi[1:t, ], Xj=Xj[1:t, ], T=t, w=w, a=a[1:t], err=err[1:t], flip=flip[1:t], 
-              kernel=kernel, sigma=sig, means=means, stdevs=stdevs))
+  return(model)
 }
 
 diag_dot = function(X) {
@@ -202,19 +228,19 @@ ada_bdk_predict = function(model, X, likelihood=FALSE) {
   if(kernel == 'rbf') {
     Ki = rbfkernel(Xnorm, sigma=sig, Y=Xi)
     Kj = rbfkernel(Xnorm, sigma=sig, Y=Xj)
-    b = rep(0, nrow(X))
+    b = 0
   }
   else {
     Ki = Xnorm %*% t(Xi)
     Kj = Xnorm %*% t(Xj)
-    b = -(diag_dot(Xi) - diag_dot(Xj)) / 2
+    b = -(diag_dot(Ki) - diag_dot(Kj)) / 2
   }
   
   a = model$a
   flip = model$flip
+  
   pred = apply(Ki - Kj + b, 1, function(row) {
-    res = flip * a * row
-    return(sum(res))
+    return(sum(flip * a * row))
   })
   
   if(likelihood) {

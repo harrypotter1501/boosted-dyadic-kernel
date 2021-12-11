@@ -26,6 +26,7 @@ data = read.table(
 
 M = 1
 N = 100
+#X = data.matrix(data[, which(names(data) != 'id_number')])
 X = data.matrix(data[, c('radius_mean', 'texture_mean')])
 y = rep(-1, nrow(X))
 y[which(data$diagnosis == 'M')] = 1
@@ -33,8 +34,12 @@ y[which(data$diagnosis == 'M')] = 1
 plot(X, col=y+3)
 
 source('./hypercuts.R')
-m = ada_bdk_train(X, y, T=10, kernel='rbf', sig=3, bs_rate=0.3)
+m = ada_bdk_train(X, y, T=150, kernel='rbf', sig=2, bs_rate=0.1)
 err = length(which(ada_bdk_predict(m, X) != y)) / length(y)
 ada_bdk_mesh(m, c(0, 30), c(5, 40), 0.1)
 points(X, col=y+3)
+
+plot(m$upper, type='l', lty=2, col=3, xlab='boost rounds', ylab='err', ylim=c(0, 1))
+lines(m$boost_errs, lty=1, col=2)
+legend(m$T/2.2, 1.0, legend=c('upper bound', 'training error'), lty=c(2, 1), col=c(3, 2))
 
