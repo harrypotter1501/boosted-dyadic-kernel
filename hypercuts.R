@@ -3,6 +3,7 @@
 library(pracma)
 library(resample)
 library(rdetools)
+library(caTools)
 
 
 normalize = function(X, test=FALSE, means=NULL, stdevs=NULL) {
@@ -109,7 +110,7 @@ w_update = function(w, a, y, pred) {
   return(wn)
 }
 
-ada_bdk_train = function(X, y, T, kernel='linear', sig=1, bs_rate=0.1) {
+ada_bdk_train = function(X, y, X_val, y_val, T, kernel='linear', sig=1, bs_rate=0.1) {
   data = normalize(X)
   Xnorm = data$X
   means = data$means
@@ -139,6 +140,7 @@ ada_bdk_train = function(X, y, T, kernel='linear', sig=1, bs_rate=0.1) {
   
   # errors
   boost_errs = rep(0, T)
+  val_errs = rep(0, T)
   upper = rep(0, T)
   
   # boost
@@ -192,8 +194,13 @@ ada_bdk_train = function(X, y, T, kernel='linear', sig=1, bs_rate=0.1) {
     be = length(which(ada_bdk_predict(model, X) != y)) / length(y)
     boost_errs[t] = be
     upper[t] = upper_bound(err[1:t])
-    model = append(model, list(boost_errs=boost_errs[1:t], upper=upper[1:t]))
-    print(sprintf('Boosting %d rounds... Current w_err = %f, accuracy = %f', t, err_min, 1 - be))
+    
+    # val
+    val_be = length(which(ada_bdk_predict(model, X_val) != y_val)) / length(y_val)
+    val_errs[t] = val_be
+    
+    model = append(model, list(boost_errs=boost_errs[1:t], val_errs=val_errs[1:t], upper=upper[1:t]))
+    #print(sprintf('Boosting %d rounds... Current w_err = %f, train_acc = %f, val_acc = %f', t, err_min, 1 - be, 1 - val_be))
     
     if(be == 0) {
       break
@@ -267,5 +274,42 @@ ada_bdk_mesh = function(m, xlim, ylim, step=0.1) {
     lines(t(matrix(c(xi, xj), 2, 2)), lty=2)
     points(t(matrix(c(xi, xj), 2, 2)), pch=20, col=c(4, 2))
   }
+}
+
+ada_bdk_cv = function(K=10, X, y, T=100, kernel='linear', sig=1, bs_rate=0.1) {
+  N = nrow(X)
+  ids = sample(seq(1, N), N)
+  val_size = floor(N / K)
+  
+  upper = rep(0, T)
+  boost_errs = rep(0, T)
+  val_errs = rep(0, T)
+  t = T
+  
+  for(k in 1:K) {
+    val_id = seq((k - 1) * val_size, k * val_size)
+    X_val = X[val_id, ]
+    y_val = y[val_id]
+    X_train = X[-val_id, ]
+    y_train = y[-val_id]
+    
+    m = ada_bdk_train(X_train, y_train, X_val, y_val, T=T, kernel=kernel, sig=sig, bs_rate=bs_rate)
+    
+    if(m$T < t) {
+      t = m$T
+    }
+    upper[1:t] = upper[1:t] + m$upper[1:t] / K
+    boost_errs[1:t] = boost_errs[1:t] + m$boost_errs[1:t] / K
+    val_errs[1:t] = val_errs[1:t] + m$val_errs[1:t] / K
+    
+    print(sprintf('Validating %d folds...', k))
+  }
+  
+  plot(upper[1:t], type='l', lty=2, col=3, xlab='boost rounds', ylab='err', xlim=c(1, t), ylim=c(0, 1))
+  lines(boost_errs[1:t], lty=1, col=2)
+  lines(val_errs[1:t], lty=1, col=4)
+  legend((t-1)/2.2+1, 1.0, legend=c('upper_bound', 'train_error', 'val_error'), lty=c(2, 1, 1), col=c(3, 2, 4))
+  
+  return(list(boost_errs=boost_errs[1:t], val_errs=val_errs[1:t]))
 }
 

@@ -24,8 +24,6 @@ data = read.table(
               'symmetry_worst', 'fractal_dimension_worst')
 )
 
-M = 1
-N = 100
 X = data.matrix(subset(
   data,
   select=-c(which(names(data) == 'id_number'), which(names(data) == 'diagnosis'))
@@ -34,15 +32,24 @@ X = data.matrix(subset(
 y = rep(-1, nrow(X))
 y[which(data$diagnosis == 'M')] = 1
 
+# # val
+# split = sample.split(seq(1, nrow(X)), SplitRatio=0.7)
+# X_train = X[split, ]
+# y_train = y[split]
+# X_val = X[!split, ]
+# y_val = y[!split]
+
 #plot(X, col=y+3)
 
 source('./hypercuts.R')
-m = ada_bdk_train(X, y, T=100, kernel='rbf', sig=2, bs_rate=0.1)
-err = length(which(ada_bdk_predict(m, X) != y)) / length(y)
+res = ada_bdk_cv(K=10, X, y, kernel='rbf', sig=2, bs_rate=0.1)
+# m = ada_bdk_train(X_train, y_train, X_val, y_val, T=100, kernel='rbf', sig=2, bs_rate=0.1)
+# err = length(which(ada_bdk_predict(m, X) != y)) / length(y)
 # ada_bdk_mesh(m, c(0, 30), c(5, 40), 0.1)
 # points(X, col=y+3)
 
-plot(m$upper, type='l', lty=2, col=3, xlab='boost rounds', ylab='err', xlim=c(1, m$T), ylim=c(0, 1))
-lines(m$boost_errs, lty=1, col=2)
-legend((m$T-1)/2.2+1, 1.0, legend=c('upper bound', 'training error'), lty=c(2, 1), col=c(3, 2))
+# plot(m$upper, type='l', lty=2, col=3, xlab='boost rounds', ylab='err', xlim=c(1, m$T), ylim=c(0, 1))
+# lines(m$boost_errs, lty=1, col=2)
+# lines(m$val_errs, lty=1, col=4)
+# legend((m$T-1)/2.2+1, 1.0, legend=c('upper_bound', 'train_error', 'val_error'), lty=c(2, 1, 1), col=c(3, 2, 4))
 
