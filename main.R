@@ -32,24 +32,18 @@ X = data.matrix(subset(
 y = rep(-1, nrow(X))
 y[which(data$diagnosis == 'M')] = 1
 
-# # val
-# split = sample.split(seq(1, nrow(X)), SplitRatio=0.7)
-# X_train = X[split, ]
-# y_train = y[split]
-# X_val = X[!split, ]
-# y_val = y[!split]
 
-#plot(X, col=y+3)
+sigs = c(2.5, 3, 3.5)
+brs = c(0.1, 0.15, 0.2)
 
 source('./hypercuts.R')
-res = ada_bdk_cv(K=10, X, y, kernel='rbf', sig=2, bs_rate=0.1)
-# m = ada_bdk_train(X_train, y_train, X_val, y_val, T=100, kernel='rbf', sig=2, bs_rate=0.1)
-# err = length(which(ada_bdk_predict(m, X) != y)) / length(y)
-# ada_bdk_mesh(m, c(0, 30), c(5, 40), 0.1)
-# points(X, col=y+3)
+#params = select_params(sigs, brs, X, y)
+res = ada_bdk_cv(K=5, X, y, kernel='rbf', sig=3, bs_rate=0.15, plot=TRUE)
 
-# plot(m$upper, type='l', lty=2, col=3, xlab='boost rounds', ylab='err', xlim=c(1, m$T), ylim=c(0, 1))
-# lines(m$boost_errs, lty=1, col=2)
-# lines(m$val_errs, lty=1, col=4)
-# legend((m$T-1)/2.2+1, 1.0, legend=c('upper_bound', 'train_error', 'val_error'), lty=c(2, 1, 1), col=c(3, 2, 4))
+# X2d = data.matrix(data[, c('compactness_mean', 'symmetry_mean')])
+# y2d = y
+# plot(X2d, col=y+3)
+# m = ada_bdk_train(X2d, y2d, X2d, y2d, T=20, sig=6)
+# ada_bdk_mesh(m, c(0, 0.4), c(0.05, 0.4), 0.001)
+# points(X2d, col=y+3)
 

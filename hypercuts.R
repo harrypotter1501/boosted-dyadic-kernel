@@ -110,7 +110,7 @@ w_update = function(w, a, y, pred) {
   return(wn)
 }
 
-ada_bdk_train = function(X, y, X_val, y_val, T, kernel='linear', sig=1, bs_rate=0.1) {
+ada_bdk_train = function(X, y, X_val, y_val, T=30, kernel='rbf', sig=3, bs_rate=0.15) {
   data = normalize(X)
   Xnorm = data$X
   means = data$means
@@ -276,7 +276,7 @@ ada_bdk_mesh = function(m, xlim, ylim, step=0.1) {
   }
 }
 
-ada_bdk_cv = function(K=10, X, y, T=100, kernel='linear', sig=1, bs_rate=0.1) {
+ada_bdk_cv = function(K=10, X, y, T=100, kernel='rbf', sig=3, bs_rate=0.15, plot=TRUE) {
   N = nrow(X)
   ids = sample(seq(1, N), N)
   val_size = floor(N / K)
@@ -302,14 +302,57 @@ ada_bdk_cv = function(K=10, X, y, T=100, kernel='linear', sig=1, bs_rate=0.1) {
     boost_errs[1:t] = boost_errs[1:t] + m$boost_errs[1:t] / K
     val_errs[1:t] = val_errs[1:t] + m$val_errs[1:t] / K
     
-    print(sprintf('Validating %d folds...', k))
+    if(plot) {
+      print(sprintf('Validating %d folds...', k))
+    }
   }
   
-  plot(upper[1:t], type='l', lty=2, col=3, xlab='boost rounds', ylab='err', xlim=c(1, t), ylim=c(0, 1))
-  lines(boost_errs[1:t], lty=1, col=2)
-  lines(val_errs[1:t], lty=1, col=4)
-  legend((t-1)/2.2+1, 1.0, legend=c('upper_bound', 'train_error', 'val_error'), lty=c(2, 1, 1), col=c(3, 2, 4))
+  if(plot) {
+    plot(upper[1:t], type='l', lty=2, col=3, xlab='rounds', ylab='err', xlim=c(1, t), ylim=c(0, 1))
+    lines(boost_errs[1:t], lty=1, col=2)
+    lines(val_errs[1:t], lty=1, col=4)
+    legend((t-1)/2.2+1, 1.0, legend=c('upper_bound', 'train_error', 'val_error'), lty=c(2, 1, 1), col=c(3, 2, 4))
+  }
   
-  return(list(boost_errs=boost_errs[1:t], val_errs=val_errs[1:t]))
+  return(list(T=t, boost_errs=boost_errs[1:t], val_errs=val_errs[1:t]))
+}
+
+
+select_params = function(sigs, bs_rates, X, y, K=5, T=30, kernel='rbf') {
+  val_err_min = Inf
+  sig_cv = sigs[1]
+  bs_cv = bs_rates[1]
+  res_cv = NULL
+  t_cv = 0
+  
+  plot(-1, -1, xlab='rounds', ylab='err', xlim=c(1, 30), ylim=c(0, 0.15))
+  
+  for(s in sigs) {
+    for(r in bs_rates) {
+      print(sprintf('Validating sigma = %f & bs_rate = %f...', s, r))
+      
+      t = Sys.time()
+      res = ada_bdk_cv(K, X, y, T=T, kernel=kernel, sig=s, bs_rate=r, plot=FALSE)
+      te = difftime(Sys.time(), t, units='secs')[[1]]
+      val_err = res$val_errs[res$T]
+      
+      if(val_err < val_err_min) {
+        sig_cv = s
+        bs_cv = r
+        res_cv = res
+        t_cv = te
+        val_err_min = val_err
+      }
+      
+      print(sprintf('Finished within %d rounds with acc = %f, time elapsed %f', res$T, 1 - val_err, te))
+      
+      lines(res$boost_errs, lty=1, col=2)
+      lines(res$val_errs, lty=1, col=4)
+    }
+  }
+  
+  legend((30-1)/1.8+1, 0.15, legend=c('train_err', 'val_err'), lty=c(1, 1), col=c(2, 4))
+  
+  return(list(T=res_cv$T, sig=sig_cv, bs_rate=bs_cv, t=t_cv))
 }
 
