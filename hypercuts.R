@@ -1,4 +1,6 @@
-# hypercuts
+###############################
+# Model Definition and Utils  #
+###############################
 
 library(pracma)
 library(resample)
@@ -6,6 +8,7 @@ library(rdetools)
 library(caTools)
 
 
+# Normalize each dimension
 normalize = function(X, test=FALSE, means=NULL, stdevs=NULL) {
   if(!test) {
     means = colMeans(X)
@@ -17,99 +20,20 @@ normalize = function(X, test=FALSE, means=NULL, stdevs=NULL) {
   return(list(X=X, means=means, stdevs=stdevs))
 }
 
-bdk_train = function(X, y, kernel='linear', sig=1) {
-  data = normalize(X)
-  Xnorm = data$X
-  means = data$means
-  stdevs = data$stdevs
-  
-  if(kernel == 'rbf') {
-    K = rbfkernel(Xnorm, sigma=sig)
-  }
-  else {
-    K = Xnorm %*% t(Xnorm)
-  }
-  
-  idp = which(y == 1)
-  idn = which(y == -1)
-  model = list(xi=X[idp[1], , drop=F], xj=X[idn[1], , drop=F], 
-               kernel=kernel, sigma=sig, means=means, stdevs=stdevs, err=Inf)
-  
-  for(i in idp) {
-    for(j in idn) {
-      b = -(K[i, i] - K[j, j]) / 2
-      pred = K[, i] - K[, j] + b
-      err = length(which(sign(pred) != y)) / length(y)
-      if(err < model$err) {
-        model$xi = X[i, , drop=F]
-        model$xj = X[j, , drop=F]
-        model$err = err
-      }
-    }
-  }
-  
-  return(model)
-}
-
-bdk_predict = function(model, X, likelihood=FALSE) {
-  xi = model$xi
-  xj = model$xj
-  means = model$means
-  stdevs = model$stdevs
-  kernel = model$kernel
-  sig = model$sigma
-  
-  Xnorm = normalize(X, test=TRUE, means=means, stdevs=stdevs)$X
-  xi = (xi - means) / stdevs
-  xj = (xj - means) / stdevs
-  
-  if(kernel == 'rbf') {
-    Ki = rbfkernel(Xnorm, sigma=sig, Y=xi)
-    Kj = rbfkernel(Xnorm, sigma=sig, Y=xj)
-    b = 0
-  }
-  else {
-    Ki = Xnorm %*% t(xi)
-    Kj = Xnorm %*% t(xj)
-    b = -((xi %*% t(xi) - xj %*% t(xj)) / 2)[1]
-  }
-  
-  pred = Ki - Kj + b
-  if(likelihood) {
-    res = sigmoid(pred)
-  }
-  else {
-    res = sign(pred)
-  }
-  return(res)
-}
-
-bdk_mesh = function(m, xlim, ylim, step=0.1) {
-  x = seq(xlim[1], xlim[2], step)
-  y = seq(ylim[1], ylim[2], step)
-  mesh = meshgrid(x, y)
-  mx = c(mesh$X)
-  my = c(mesh$Y)
-  Xmesh = matrix(c(mx, my), length(mx), 2)
-  
-  pred = bdk_predict(m, Xmesh)
-  points(Xmesh, pch=19, col=pred+4)
-  
-  lines(t(matrix(c(m$xi,m$xj), 2, 2)), lty=2)
-  points(t(matrix(c(m$xi,m$xj), 2, 2)), pch=20, col=c(4, 2))
-}
-
+# Adaboost training error upper bound
 upper_bound = function(eps) {
   res = exp(-2 * sum((1/2 - eps)^2))
   return(res)
 }
 
+# Adaboost update weights
 w_update = function(w, a, y, pred) {
   wn = w * exp(-a * y * pred)
   wn = wn / sum(wn)
   return(wn)
 }
 
+# Train
 ada_bdk_train = function(X, y, X_val, y_val, T=30, kernel='rbf', sig=3, bs_rate=0.15) {
   data = normalize(X)
   Xnorm = data$X
@@ -210,6 +134,7 @@ ada_bdk_train = function(X, y, X_val, y_val, T=30, kernel='rbf', sig=3, bs_rate=
   return(model)
 }
 
+# Calcuate dot products along the diagonals
 diag_dot = function(X) {
   res = apply(X, 1, function(row) {
     return(t(row) %*% row)
@@ -217,6 +142,7 @@ diag_dot = function(X) {
   return(res)
 }
 
+# Prediction
 ada_bdk_predict = function(model, X, likelihood=FALSE) {
   means = model$means
   stdevs = model$stdevs
@@ -255,6 +181,7 @@ ada_bdk_predict = function(model, X, likelihood=FALSE) {
   return(res)
 }
 
+# Plot 2D example
 ada_bdk_mesh = function(m, xlim, ylim, step=0.1) {
   x = seq(xlim[1], xlim[2], step)
   y = seq(ylim[1], ylim[2], step)
@@ -276,6 +203,7 @@ ada_bdk_mesh = function(m, xlim, ylim, step=0.1) {
   }
 }
 
+# Crossvalidation
 ada_bdk_cv = function(K=10, X, y, T=100, kernel='rbf', sig=3, bs_rate=0.15, plot=TRUE) {
   N = nrow(X)
   ids = sample(seq(1, N), N)
@@ -318,6 +246,7 @@ ada_bdk_cv = function(K=10, X, y, T=100, kernel='rbf', sig=3, bs_rate=0.15, plot
 }
 
 
+# CV select parameter
 select_params = function(sigs, bs_rates, X, y, K=5, T=30, kernel='rbf') {
   val_err_min = Inf
   sig_cv = sigs[1]
