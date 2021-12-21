@@ -1,8 +1,8 @@
-# Boosted Dyadic Kernel Discriminant
+# Boosted Dyadic Kernel Discriminants
 
 ## EECS6690-2021Fall Final Project
 
-Reproduced and improved the Boosted Dyadic Kernel Discriminant. 
+Reproduced and improved the Boosted Dyadic Kernel Discriminants. 
 
 ## Authors
 * Yuqing Cao (yc3998)
@@ -11,7 +11,7 @@ Reproduced and improved the Boosted Dyadic Kernel Discriminant.
 
 ## Description
 
-Reproduced results of Boosted Dyadic Kernel Discriminant[1], introcuded bootstrap and cross validatioin trying to improve the performance, impelmented and analyzed dimensionality reduction. 
+Reproduced results of Boosted Dyadic Kernel Discriminants[1], introcuded bootstrap and cross validatioin trying to improve the performance, impelmented and analyzed dimensionality reduction. 
 
 ## Getting Started
 
