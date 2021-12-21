@@ -11,7 +11,7 @@ Reproduced and improved the Boosted Dyadic Kernel Discriminant.
 
 ## Description
 
-Reproduced results of Boosted Dyadic Kernel Discriminant[1], conducted experiments trying to improve the performance, impelmented and analyzed dimensionality reduction. 
+Reproduced results of Boosted Dyadic Kernel Discriminant[1], introcuded bootstrap and cross validatioin, conducted experiments trying to improve the performance, impelmented and analyzed dimensionality reduction. 
 
 ## Getting Started
 
